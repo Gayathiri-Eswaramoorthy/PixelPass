@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Shield } from "lucide-react";
+import { loginSchema } from "@/lib/validation";
+import { hashImageSequence, constantTimeCompare } from "@/lib/crypto";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -17,7 +19,9 @@ const Login = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [passwordData, setPasswordData] = useState<any>(null);
   const [shuffledImages, setShuffledImages] = useState<string[]>([]);
-  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [selectedImages, setSelectedImages] = useState<{ url: string; order: number }[]>([]);
+  const [storedSequence, setStoredSequence] = useState<string[]>([]);
+  const [requiredImageCount, setRequiredImageCount] = useState(4);
 
   useEffect(() => {
     checkUser();
@@ -32,6 +36,15 @@ const Login = () => {
 
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate inputs
+    const validation = loginSchema.safeParse({ email, password });
+    if (!validation.success) {
+      const errors = validation.error.errors.map(e => e.message).join(", ");
+      toast.error(errors);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -62,6 +75,10 @@ const Login = () => {
 
         setUserId(authData.user.id);
         setPasswordData(pwData);
+        setRequiredImageCount(pwData.image_count);
+        
+        // Store the hashed sequence from the database
+        setStoredSequence(pwData.image_sequence);
 
         // Generate images and shuffle
         const { data: imgData, error: imgError } = await supabase.functions.invoke('generate-images', {
@@ -75,7 +92,6 @@ const Login = () => {
         setStep("images");
       }
     } catch (error: any) {
-      console.error("Login error:", error);
       toast.error("Login failed");
     } finally {
       setLoading(false);
@@ -83,38 +99,47 @@ const Login = () => {
   };
 
   const handleImageClick = (image: string) => {
-    if (selectedImages.includes(image)) {
-      setSelectedImages(selectedImages.filter(img => img !== image));
-    } else if (selectedImages.length < passwordData.image_count) {
-      setSelectedImages([...selectedImages, image]);
+    const existingIndex = selectedImages.findIndex(img => img.url === image);
+    
+    if (existingIndex !== -1) {
+      // Remove image and reorder remaining
+      setSelectedImages(selectedImages.filter(img => img.url !== image));
+    } else if (selectedImages.length < requiredImageCount) {
+      // Add new image
+      setSelectedImages([...selectedImages, { url: image, order: selectedImages.length + 1 }]);
     }
   };
 
   const handleImageSubmit = async () => {
-    if (selectedImages.length !== passwordData.image_count) {
-      toast.error(`Please select exactly ${passwordData.image_count} images`);
+    if (selectedImages.length !== requiredImageCount) {
+      toast.error(`Please select exactly ${requiredImageCount} images in order`);
       return;
     }
 
     setLoading(true);
-
-    // Verify sequence
-    const isCorrect = JSON.stringify(selectedImages) === JSON.stringify(passwordData.image_sequence);
-
-    if (isCorrect) {
-      toast.success("Login successful!");
-      navigate("/dashboard");
-    } else {
-      toast.error("Incorrect image sequence. Please try again.");
-      await supabase.auth.signOut();
-      setStep("credentials");
-      setSelectedImages([]);
+    try {
+      const selectedSequence = selectedImages.map(img => img.url);
+      const selectedHash = await hashImageSequence(selectedSequence);
+      
+      // The stored sequence is already a hash (single element array with hash)
+      const storedHash = storedSequence[0];
+      
+      // Use constant-time comparison to prevent timing attacks
+      if (constantTimeCompare(selectedHash, storedHash)) {
+        toast.success("Login successful!");
+        navigate("/dashboard");
+      } else {
+        toast.error("Incorrect image sequence. Please try again.");
+        setSelectedImages([]);
+      }
+    } catch (error) {
+      toast.error("Login failed");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
-  const gridCols = passwordData?.image_count === 4 ? "grid-cols-4" : "grid-cols-6";
+  const gridCols = requiredImageCount === 4 ? "grid-cols-4" : "grid-cols-6";
 
   if (step === "images") {
     return (
@@ -128,16 +153,17 @@ const Login = () => {
           </div>
 
           <div className="text-center space-y-2">
-            <p className="text-lg">Select {passwordData.image_count} images in the correct order</p>
+            <p className="text-lg">Select {requiredImageCount} images in the correct order</p>
             <p className="text-sm text-muted-foreground">
-              Selected: {selectedImages.length}/{passwordData.image_count}
+              Selected: {selectedImages.length}/{requiredImageCount}
             </p>
           </div>
 
           <div className={`grid ${gridCols} gap-4`}>
             {shuffledImages.map((image, index) => {
-              const isSelected = selectedImages.includes(image);
-              const selectionOrder = selectedImages.indexOf(image) + 1;
+              const selectedItem = selectedImages.find(img => img.url === image);
+              const isSelected = !!selectedItem;
+              const selectionOrder = selectedItem?.order || 0;
 
               return (
                 <button
@@ -162,7 +188,7 @@ const Login = () => {
 
           <Button
             onClick={handleImageSubmit}
-            disabled={selectedImages.length !== passwordData.image_count || loading}
+            disabled={selectedImages.length !== requiredImageCount || loading}
             className="w-full bg-gradient-to-r from-primary to-secondary"
           >
             {loading ? (

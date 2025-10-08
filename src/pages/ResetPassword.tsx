@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Shield } from "lucide-react";
+import { resetPasswordSchema } from "@/lib/validation";
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -18,14 +19,17 @@ const ResetPassword = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate inputs
+    const validation = resetPasswordSchema.safeParse({
+      password,
+      imageCount,
+      theme,
+    });
 
-    if (!password || !theme) {
-      toast.error("Please fill in all fields");
-      return;
-    }
-
-    if (password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    if (!validation.success) {
+      const errors = validation.error.errors.map(e => e.message).join(", ");
+      toast.error(errors);
       return;
     }
 

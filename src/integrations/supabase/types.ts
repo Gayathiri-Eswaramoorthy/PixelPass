@@ -110,7 +110,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      hash_image_sequence: {
+        Args: { sequence: string[] }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

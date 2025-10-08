@@ -14,6 +14,21 @@ serve(async (req) => {
 
   try {
     const { email, resetLink } = await req.json();
+    
+    // Validate inputs
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return new Response(
+        JSON.stringify({ error: 'Valid email is required' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+    
+    if (!resetLink || typeof resetLink !== 'string' || !resetLink.startsWith('http')) {
+      return new Response(
+        JSON.stringify({ error: 'Valid reset link is required' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
 
     console.log("Sending password reset email to:", email);
 

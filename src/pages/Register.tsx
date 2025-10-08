@@ -7,7 +7,8 @@ import { Card } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Shield } from "lucide-react";
+import { Loader2, Shield, CheckCircle2, XCircle } from "lucide-react";
+import { registerSchema } from "@/lib/validation";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -17,16 +18,36 @@ const Register = () => {
   const [theme, setTheme] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const getPasswordStrength = (pwd: string): { score: number; label: string; color: string } => {
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (pwd.length >= 12) score++;
+    if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) score++;
+    if (/\d/.test(pwd)) score++;
+    if (/[^a-zA-Z0-9]/.test(pwd)) score++;
+
+    if (score <= 2) return { score, label: "Weak", color: "text-destructive" };
+    if (score <= 3) return { score, label: "Fair", color: "text-yellow-500" };
+    if (score <= 4) return { score, label: "Good", color: "text-blue-500" };
+    return { score, label: "Strong", color: "text-green-500" };
+  };
+
+  const passwordStrength = getPasswordStrength(password);
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password || !theme) {
-      toast.error("Please fill in all fields");
-      return;
-    }
+    // Validate inputs using Zod
+    const validation = registerSchema.safeParse({
+      email,
+      password,
+      imageCount,
+      theme,
+    });
 
-    if (password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    if (!validation.success) {
+      const errors = validation.error.errors.map(e => e.message).join(", ");
+      toast.error(errors);
       return;
     }
 
@@ -90,7 +111,7 @@ const Register = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">Password (min. 8 characters)</Label>
             <Input
               id="password"
               type="password"
@@ -99,6 +120,31 @@ const Register = () => {
               onChange={(e) => setPassword(e.target.value)}
               required
             />
+            {password && (
+              <div className="flex items-center gap-2 text-sm">
+                <div className="flex gap-1 flex-1">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div
+                      key={i}
+                      className={`h-1 flex-1 rounded ${
+                        i <= passwordStrength.score
+                          ? passwordStrength.score <= 2
+                            ? "bg-destructive"
+                            : passwordStrength.score <= 3
+                            ? "bg-yellow-500"
+                            : passwordStrength.score <= 4
+                            ? "bg-blue-500"
+                            : "bg-green-500"
+                          : "bg-muted"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <span className={passwordStrength.color}>
+                  {passwordStrength.label}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

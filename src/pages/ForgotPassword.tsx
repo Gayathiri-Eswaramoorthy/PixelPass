@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Shield, ArrowLeft } from "lucide-react";
+import { forgotPasswordSchema } from "@/lib/validation";
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
@@ -15,6 +16,14 @@ const ForgotPassword = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate email
+    const validation = forgotPasswordSchema.safeParse({ email });
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
+
     setLoading(true);
 
     try {

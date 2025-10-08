@@ -12,19 +12,38 @@ serve(async (req) => {
 
   try {
     const { theme, count } = await req.json();
+    
+    // Validate inputs
+    if (!theme || typeof theme !== 'string' || theme.trim().length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'Theme is required and must be a non-empty string' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+    
+    if (!count || typeof count !== 'number' || count < 1 || count > 40) {
+      return new Response(
+        JSON.stringify({ error: 'Count must be a number between 1 and 40' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+    
+    // Sanitize theme input to prevent injection
+    const sanitizedTheme = theme.trim().replace(/[^a-zA-Z0-9\s]/g, '').substring(0, 50);
+    
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    console.log(`Generating ${count} images for theme: ${theme}`);
+    console.log(`Generating ${count} images for theme: ${sanitizedTheme}`);
 
     const images: string[] = [];
     
     // Generate images sequentially
     for (let i = 0; i < count; i++) {
-      const prompt = `A simple, recognizable icon-style image of a ${theme}, variation ${i + 1}. Clean, minimalist design suitable for authentication. High quality, clear details.`;
+      const prompt = `A simple, recognizable icon-style image of a ${sanitizedTheme}, variation ${i + 1}. Clean, minimalist design suitable for authentication. High quality, clear details.`;
       
       const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',

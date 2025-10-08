@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Shield, Check } from "lucide-react";
+import { hashImageSequence } from "@/lib/crypto";
 
 const SetupPassword = () => {
   const navigate = useNavigate();
@@ -57,13 +58,18 @@ const SetupPassword = () => {
 
     setLoading(true);
     try {
+      const imageSequence = selectedImages;
+      
+      // Hash the image sequence before storing
+      const hashedSequence = await hashImageSequence(imageSequence);
+      
       const { error } = await supabase
         .from('image_passwords')
         .insert({
           user_id: userId,
           image_count: imageCount,
           theme,
-          image_sequence: selectedImages
+          image_sequence: [hashedSequence] // Store as single hash in array
         });
 
       if (error) throw error;
@@ -71,7 +77,6 @@ const SetupPassword = () => {
       toast.success("Password setup complete!");
       navigate("/login");
     } catch (error: any) {
-      console.error("Setup error:", error);
       toast.error("Failed to save password");
     } finally {
       setLoading(false);

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Shield, Upload, FileText, Trash2, Download, LogOut, Loader2 } from "lucide-react";
+import { validateFile } from "@/lib/validation";
 
 interface Document {
   id: string;
@@ -55,6 +56,13 @@ const Dashboard = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      toast.error(validation.error);
+      return;
+    }
+
     setUploading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -83,7 +91,6 @@ const Dashboard = () => {
       toast.success("Document uploaded successfully!");
       loadDocuments();
     } catch (error: any) {
-      console.error("Upload error:", error);
       toast.error("Failed to upload document");
     } finally {
       setUploading(false);
@@ -108,7 +115,6 @@ const Dashboard = () => {
       toast.success("Document deleted");
       loadDocuments();
     } catch (error: any) {
-      console.error("Delete error:", error);
       toast.error("Failed to delete document");
     }
   };
@@ -128,7 +134,6 @@ const Dashboard = () => {
       a.click();
       URL.revokeObjectURL(url);
     } catch (error: any) {
-      console.error("Download error:", error);
       toast.error("Failed to download document");
     }
   };
