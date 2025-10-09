@@ -80,14 +80,20 @@ const Login = () => {
         // Store the hashed sequence from the database
         setStoredSequence(pwData.image_sequence);
 
-        // Generate images and shuffle
+        // Fetch user's registered images and generate distractors
+        const gridSize = pwData.image_count === 4 ? 16 : 36;
+        const distractorCount = gridSize - pwData.image_count;
+        
+        // Generate distractor images
         const { data: imgData, error: imgError } = await supabase.functions.invoke('generate-images', {
-          body: { theme: pwData.theme, count: pwData.image_count === 4 ? 16 : 36 }
+          body: { theme: pwData.theme, count: distractorCount }
         });
 
         if (imgError) throw imgError;
 
-        const shuffled = [...imgData.images].sort(() => Math.random() - 0.5);
+        // Combine user's registered images with distractors and shuffle
+        const allImages = [...pwData.selected_images, ...imgData.images];
+        const shuffled = allImages.sort(() => Math.random() - 0.5);
         setShuffledImages(shuffled);
         setStep("images");
       }
@@ -211,7 +217,7 @@ const Login = () => {
         <div className="flex items-center justify-center gap-2 mb-6">
           <Shield className="w-8 h-8 text-primary" />
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            SecureAuth
+            PixelPass
           </h1>
         </div>
 

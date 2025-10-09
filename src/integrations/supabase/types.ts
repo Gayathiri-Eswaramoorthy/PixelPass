@@ -58,6 +58,7 @@ export type Database = {
           id: string
           image_count: number
           image_sequence: string[]
+          selected_images: string[]
           theme: string
           user_id: string
         }
@@ -66,6 +67,7 @@ export type Database = {
           id?: string
           image_count: number
           image_sequence: string[]
+          selected_images?: string[]
           theme: string
           user_id: string
         }
@@ -74,6 +76,7 @@ export type Database = {
           id?: string
           image_count?: number
           image_sequence?: string[]
+          selected_images?: string[]
           theme?: string
           user_id?: string
         }

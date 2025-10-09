@@ -88,7 +88,7 @@ const Register = () => {
         <div className="flex items-center justify-center gap-2 mb-6">
           <Shield className="w-8 h-8 text-primary" />
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            SecureAuth
+            PixelPass
           </h1>
         </div>
 

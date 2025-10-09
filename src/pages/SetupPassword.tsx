@@ -69,7 +69,8 @@ const SetupPassword = () => {
           user_id: userId,
           image_count: imageCount,
           theme,
-          image_sequence: [hashedSequence] // Store as single hash in array
+          image_sequence: [hashedSequence], // Store as single hash in array
+          selected_images: imageSequence // Store actual URLs for login
         });
 
       if (error) throw error;
@@ -99,7 +100,7 @@ const SetupPassword = () => {
         <div className="flex items-center justify-center gap-2">
           <Shield className="w-8 h-8 text-primary" />
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            Setup Your Password
+            Setup Your PixelPass
           </h1>
         </div>
 
