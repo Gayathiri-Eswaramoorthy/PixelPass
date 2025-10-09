@@ -89,7 +89,16 @@ const Login = () => {
           body: { theme: pwData.theme, count: distractorCount }
         });
 
-        if (imgError) throw imgError;
+        if (imgError) {
+          if (imgError.message?.includes('high demand') || imgError.message?.includes('rate limit')) {
+            toast.error("Service is busy. Please try again in a moment.");
+          } else {
+            toast.error("Failed to load login images. Please try again.");
+          }
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
+        }
 
         // Combine user's registered images with distractors and shuffle
         const allImages = [...pwData.selected_images, ...imgData.images];

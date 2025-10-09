@@ -32,11 +32,19 @@ const SetupPassword = () => {
         body: { theme, count: gridSize }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Image generation error:", error);
+        if (error.message?.includes('high demand') || error.message?.includes('rate limit')) {
+          toast.error("Service is busy. Please wait a moment and try again, or use a different theme.");
+        } else {
+          toast.error("Failed to generate images. Please try again.");
+        }
+        return;
+      }
       setImages(data.images);
     } catch (error: any) {
       console.error("Image generation error:", error);
-      toast.error("Failed to generate images");
+      toast.error("Failed to generate images. Please try again.");
     } finally {
       setLoading(false);
     }

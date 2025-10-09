@@ -39,49 +39,71 @@ serve(async (req) => {
 
     console.log(`Generating ${count} images for theme: ${sanitizedTheme}`);
 
-    // Generate images in parallel batches to speed up generation
-    const batchSize = 5; // Generate 5 images at a time to avoid rate limits
     const images: string[] = [];
     
-    const generateImage = async (index: number): Promise<string> => {
+    const generateImage = async (index: number, retryCount = 0): Promise<string> => {
+      const maxRetries = 3;
       const prompt = `A simple, recognizable icon-style image of a ${sanitizedTheme}, variation ${index + 1}. Clean, minimalist design suitable for authentication. High quality, clear details.`;
       
-      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'google/gemini-2.5-flash-image-preview',
-          messages: [
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          modalities: ['image', 'text']
-        }),
-      });
+      try {
+        const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-2.5-flash-image-preview',
+            messages: [
+              {
+                role: 'user',
+                content: prompt
+              }
+            ],
+            modalities: ['image', 'text']
+          }),
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('AI gateway error:', response.status, errorText);
-        throw new Error(`Failed to generate image ${index + 1}`);
-      }
+        if (response.status === 429) {
+          const errorText = await response.text();
+          console.error('Rate limited:', errorText);
+          
+          if (retryCount < maxRetries) {
+            // Exponential backoff: wait 2^retryCount seconds
+            const waitTime = Math.pow(2, retryCount) * 1000;
+            console.log(`Retrying image ${index + 1} after ${waitTime}ms (attempt ${retryCount + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            return generateImage(index, retryCount + 1);
+          }
+          
+          throw new Error('RATE_LIMIT_EXCEEDED');
+        }
 
-      const data = await response.json();
-      const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-      
-      if (!imageUrl) {
-        throw new Error(`No image URL in response for image ${index + 1}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('AI gateway error:', response.status, errorText);
+          throw new Error(`Failed to generate image ${index + 1}`);
+        }
+
+        const data = await response.json();
+        const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+        
+        if (!imageUrl) {
+          throw new Error(`No image URL in response for image ${index + 1}`);
+        }
+        
+        console.log(`Generated image ${index + 1}/${count}`);
+        return imageUrl;
+      } catch (error) {
+        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
+          throw error;
+        }
+        throw error;
       }
-      
-      console.log(`Generated image ${index + 1}/${count}`);
-      return imageUrl;
     };
     
-    // Process in batches
+    // Generate with smaller batches and delays to avoid rate limits
+    const batchSize = 3;
     for (let i = 0; i < count; i += batchSize) {
       const batch = [];
       for (let j = i; j < Math.min(i + batchSize, count); j++) {
@@ -89,6 +111,11 @@ serve(async (req) => {
       }
       const batchResults = await Promise.all(batch);
       images.push(...batchResults);
+      
+      // Add delay between batches to respect rate limits
+      if (i + batchSize < count) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
     }
 
     return new Response(
@@ -101,6 +128,20 @@ serve(async (req) => {
   } catch (error: unknown) {
     console.error('Error in generate-images function:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    
+    // Provide user-friendly message for rate limits
+    if (errorMessage === 'RATE_LIMIT_EXCEEDED') {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Service is currently experiencing high demand. Please try again in a few moments or use a different theme.' 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 429 
+        }
+      );
+    }
+    
     return new Response(
       JSON.stringify({ error: errorMessage }),
       { 
