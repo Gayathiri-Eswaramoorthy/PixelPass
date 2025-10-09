@@ -39,11 +39,12 @@ serve(async (req) => {
 
     console.log(`Generating ${count} images for theme: ${sanitizedTheme}`);
 
+    // Generate images in parallel batches to speed up generation
+    const batchSize = 5; // Generate 5 images at a time to avoid rate limits
     const images: string[] = [];
     
-    // Generate images sequentially
-    for (let i = 0; i < count; i++) {
-      const prompt = `A simple, recognizable icon-style image of a ${sanitizedTheme}, variation ${i + 1}. Clean, minimalist design suitable for authentication. High quality, clear details.`;
+    const generateImage = async (index: number): Promise<string> => {
+      const prompt = `A simple, recognizable icon-style image of a ${sanitizedTheme}, variation ${index + 1}. Clean, minimalist design suitable for authentication. High quality, clear details.`;
       
       const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
@@ -66,18 +67,28 @@ serve(async (req) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('AI gateway error:', response.status, errorText);
-        throw new Error(`Failed to generate image ${i + 1}`);
+        throw new Error(`Failed to generate image ${index + 1}`);
       }
 
       const data = await response.json();
       const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
       
-      if (imageUrl) {
-        images.push(imageUrl);
-        console.log(`Generated image ${i + 1}/${count}`);
-      } else {
-        throw new Error(`No image URL in response for image ${i + 1}`);
+      if (!imageUrl) {
+        throw new Error(`No image URL in response for image ${index + 1}`);
       }
+      
+      console.log(`Generated image ${index + 1}/${count}`);
+      return imageUrl;
+    };
+    
+    // Process in batches
+    for (let i = 0; i < count; i += batchSize) {
+      const batch = [];
+      for (let j = i; j < Math.min(i + batchSize, count); j++) {
+        batch.push(generateImage(j));
+      }
+      const batchResults = await Promise.all(batch);
+      images.push(...batchResults);
     }
 
     return new Response(
