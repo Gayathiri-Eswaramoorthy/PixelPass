@@ -52,6 +52,9 @@ All colors MUST be HSL.
     --shadow-glow: 0 0 40px hsl(250 80% 70% / 0.4);
     
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  #lovable-badge {
+    display: none !important;
+  }
   }
 
   .dark {
