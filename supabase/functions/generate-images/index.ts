@@ -79,6 +79,11 @@ serve(async (req) => {
           throw new Error('RATE_LIMIT_EXCEEDED');
         }
 
+        if (response.status === 402) {
+          console.error('Payment required: Out of credits');
+          throw new Error('PAYMENT_REQUIRED');
+        }
+
         if (!response.ok) {
           const errorText = await response.text();
           console.error('AI gateway error:', response.status, errorText);
@@ -95,7 +100,7 @@ serve(async (req) => {
         console.log(`Generated image ${index + 1}/${count}`);
         return imageUrl;
       } catch (error) {
-        if (error instanceof Error && error.message === 'RATE_LIMIT_EXCEEDED') {
+        if (error instanceof Error && (error.message === 'RATE_LIMIT_EXCEEDED' || error.message === 'PAYMENT_REQUIRED')) {
           throw error;
         }
         throw error;
@@ -128,6 +133,19 @@ serve(async (req) => {
   } catch (error: unknown) {
     console.error('Error in generate-images function:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    
+    // Provide user-friendly message for payment required
+    if (errorMessage === 'PAYMENT_REQUIRED') {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Out of AI credits. Please add credits to your Lovable workspace in Settings → Workspace → Usage to continue generating images.' 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 402 
+        }
+      );
+    }
     
     // Provide user-friendly message for rate limits
     if (errorMessage === 'RATE_LIMIT_EXCEEDED') {
